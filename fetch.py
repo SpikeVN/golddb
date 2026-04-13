@@ -135,7 +135,7 @@ def btmc_today() -> Price24K:
 
 # %%
 def btmh_today() -> Price24K:
-    soup = bs4.BeautifulSoup(requests.get("https://baotinmanhhai.vn/gia-vang-hom-nay").text, "html.parser")
+    soup = bs4.BeautifulSoup(requests.get("https://baotinmanhhai.vn/gia-vang-hom-nay", verify=False).text, "html.parser")
     price_table = list(list(soup.find_all(class_="gold-table-content")[0].children)[3].children)  # type: ignore
     return Price24K (
         taken_on=datetime.datetime.now(),
