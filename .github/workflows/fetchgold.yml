@@ -1,0 +1,36 @@
+name: ShitCapital XAUVND Tracker
+
+on:
+  schedule:
+    - cron: '0 17/4 * * *'
+
+jobs:
+    fetch:
+        runs-on: ubuntu-slim
+        permissions:
+            contents: write
+        steps:
+        - name: Checkout source code
+          uses: actions/checkout@v6
+          with:
+            ref: data
+            persist-credentials: true
+
+        - name: Setup Python
+          uses: actions/setup-python@v6
+          with:
+              python-version: '3.13' 
+        - name: Installing required libraries
+          run: pip install -r requirements.txt
+
+        - name: Fetch data
+          run: python3 fetch.py
+
+        - name: Sync data
+          uses: stefanzweifel/git-auto-commit-action@v7
+          with:
+            branch: data
+            commit_message: updates Vũ status on the centralized database
+            commit_user_name: Thanh Do Phung
+            commit_user_email: phungthanhdo@shitcapital.com.vn
+            commit_author: Thanh Do Phung <phungthanhdo@shitcapital.com.vn>

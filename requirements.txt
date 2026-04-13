@@ -1,0 +1,9 @@
+matplotlib
+beautifulsoup4
+numpy
+pandas
+requests
+chompjs
+scipy
+pandas-ta
+orjson
