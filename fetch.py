@@ -1,15 +1,13 @@
 # %%
 import requests
 import bs4
-import pandas as pd
 import orjson
-import chompjs
-import numpy as np
 import datetime
 import dataclasses
 import xml.etree.ElementTree as ET
 import time
 import os
+from concurrent.futures import ThreadPoolExecutor
 
 @dataclasses.dataclass
 class Price24K:
@@ -21,30 +19,30 @@ class Price24K:
     vendor: str = ""
 
 # %%
-def sjc_onemonth() -> pd.DataFrame:
-    soup = bs4.BeautifulSoup(requests.get("https://giavang.org").text, "html.parser")
-    data = chompjs.parse_js_object(soup.find_all("script")[13].text.split("\n")[2].replace("    var seriesOptions = ", "")[:-1])
+# def sjc_onemonth() -> pd.DataFrame:
+#     soup = bs4.BeautifulSoup(requests.get("https://giavang.org").text, "html.parser")
+#     data = chompjs.parse_js_object(soup.find_all("script")[13].text.split("\n")[2].replace("    var seriesOptions = ", "")[:-1])
 
-    return pd.DataFrame(
-        {
-            "buy": np.array(data[0]["data"])[:, 1],
-            "sell": np.array(data[1]["data"])[:, 1],
-        },
-        index=pd.DatetimeIndex([datetime.datetime.fromtimestamp(i/1000).date().isoformat() for i, _ in data[0]["data"]])
-    )
+#     return pd.DataFrame(
+#         {
+#             "buy": np.array(data[0]["data"])[:, 1],
+#             "sell": np.array(data[1]["data"])[:, 1],
+#         },
+#         index=pd.DatetimeIndex([datetime.datetime.fromtimestamp(i/1000).date().isoformat() for i, _ in data[0]["data"]])
+#     )
 
 # %%
-def sjc_threemonths() -> pd.DataFrame:
-    soup = bs4.BeautifulSoup(requests.get("https://giavang.org/trong-nuoc/sjc").text, "html.parser")
-    data = chompjs.parse_js_object(soup.find_all("script")[15].text.split("\n")[2].replace("    var seriesOptions = ", "")[:-1])
+# def sjc_threemonths() -> pd.DataFrame:
+#     soup = bs4.BeautifulSoup(requests.get("https://giavang.org/trong-nuoc/sjc").text, "html.parser")
+#     data = chompjs.parse_js_object(soup.find_all("script")[15].text.split("\n")[2].replace("    var seriesOptions = ", "")[:-1])
 
-    return pd.DataFrame(
-        {
-            "buy": np.array(data[0]["data"])[:, 1],
-            "sell": np.array(data[1]["data"])[:, 1],
-        },
-        index=pd.DatetimeIndex([datetime.datetime.fromtimestamp(i/1000).date().isoformat() for i, _ in data[0]["data"]])
-    )
+#     return pd.DataFrame(
+#         {
+#             "buy": np.array(data[0]["data"])[:, 1],
+#             "sell": np.array(data[1]["data"])[:, 1],
+#         },
+#         index=pd.DatetimeIndex([datetime.datetime.fromtimestamp(i/1000).date().isoformat() for i, _ in data[0]["data"]])
+#     )
 
 # %%
 def sjc_today() -> Price24K:
@@ -136,13 +134,26 @@ def btmc_today() -> Price24K:
 # %%
 def btmh_today() -> Price24K:
     soup = bs4.BeautifulSoup(requests.get("https://baotinmanhhai.vn/gia-vang-hom-nay", verify=False).text, "html.parser")
-    price_table = list(list(soup.find_all(class_="gold-table-content")[0].children)[3].children)  # type: ignore
-    return Price24K (
+    buy_bullion: int = 0
+    sell_bullion: int = 0
+    buy_ring: int = 0
+    sell_ring: int = 0
+
+    for i in list(filter(lambda x: True if x.select(".items-center") else False,soup.select("div.flex div.grid")))[:-3]:
+        if i.contents[0].contents[1].text == "Nhẫn Tròn ép vỉ (Kim Gia Bảo ) 24K (999.9)":
+            sell_ring = int(i.contents[1].contents[0].contents[0].text.replace(".", "")) * 10
+            buy_ring = int(i.contents[2].contents[0].contents[0].text.replace(".", "")) * 10
+
+        if i.contents[0].contents[1].text == "Đồng vàng Kim Gia Bảo hoa sen":
+            sell_bullion = int(i.contents[1].contents[0].contents[0].text.replace(".", "")) * 10
+            buy_bullion = int(i.contents[2].contents[0].contents[0].text.replace(".", "")) * 10
+
+    return Price24K(    
         taken_on=datetime.datetime.now(),
-        buy_ring = int(list(price_table[1].children)[3].text.replace(".", "").strip()) * 10,
-        sell_ring = int(list(price_table[1].children)[5].text.replace(".", "").strip()) * 10,
-        buy_bullion = int(list(price_table[5].children)[3].text.replace(".", "").strip()) * 100,
-        sell_bullion = int(list(price_table[5].children)[5].text.replace(".", "").strip()) * 100,
+        buy_bullion=buy_bullion,
+        sell_bullion=sell_bullion,
+        buy_ring=buy_ring,
+        sell_ring=sell_ring,
         vendor="BTMH"
     )
 
@@ -166,16 +177,12 @@ def mihong_today() -> Price24K:
     sell_bullion = 0
     buy_ring = 0
     sell_ring = 0
-    s.get("http://mihong.vn/vi/gia-vang-trong-nuoc")
-    data = s.get('https://mihong.vn/api/v1/gold/prices/current', headers={
-        'Host': 'mihong.vn',
-        'X-Requested-With': 'XMLHttpRequest',
-        'Referer': 'https://mihong.vn/vi/gia-vang-trong-nuoc',
-    }, verify=False).json()
-    for i in data["data"]:
+    data = requests.get("https://api.mihong.vn/v1/gold-prices?market=domestic").json()
+    for i in data:
         if i["code"] == "999":
             buy_bullion = buy_ring = i["buyingPrice"] * 10
             sell_ring = sell_bullion = i["sellingPrice"] * 10
+
 
     return Price24K(
         taken_on=datetime.datetime.now(),
@@ -189,25 +196,32 @@ def mihong_today() -> Price24K:
 # %%
 def ngoctham_today() -> Price24K:
     s = bs4.BeautifulSoup(requests.get("https://ngoctham.com/bang-gia-vang/").text)
-    ring = list(s.find_all("tr", attrs={"data-id": "61"})[1].children)
-    bullion = list(s.find_all("tr", attrs={"data-id": "60"})[1].children)
+    buy_bullion = 0
+    sell_bullion = 0
+    buy_ring = 0
+    sell_ring = 0
+
+    for i in list(s.select("table.table tr"))[3:]:
+        if list(i.find_all("td", attrs={"class": "name-gold"}))[0].text == "Vàng Ta 999.9":
+            buy_bullion = int(list(i.find_all("td", attrs={"class": "price-buy"}))[0].text.replace(".", "")) * 10
+            sell_bullion = int(list(i.find_all("td", attrs={"class": "price-sell"}))[0].text.replace(".", "")) * 10
+        if list(i.find_all("td", attrs={"class": "name-gold"}))[0].text == "Nhẫn 999.9":
+            buy_ring = int(list(i.find_all("td", attrs={"class": "price-buy"}))[0].text.replace(".", "")) * 10
+            sell_ring = int(list(i.find_all("td", attrs={"class": "price-sell"}))[0].text.replace(".", "")) * 10
 
     return Price24K(
         taken_on=datetime.datetime.now(),
-        buy_bullion = int(bullion[3].text.strip().replace(".", "")) * 10,
-        sell_bullion = int(bullion[5].text.strip().replace(".", "")) * 10,
-        buy_ring = int(ring[3].text.strip().replace(".", "")) * 10,
-        sell_ring = int(ring[5].text.strip().replace(".", "")) * 10,
-        vendor="NTH",
+        buy_bullion=buy_bullion,
+        sell_bullion=sell_bullion,
+        buy_ring=buy_ring,
+        sell_ring=sell_ring,
+        vendor="NTH"
     )
 
 # %%
-def fetch_all() -> list[Price24K]:
+def fetch_thread(fetch_method) -> tuple[Price24K, str]:
     results = []
-    print(f"            vendor  buy bullion    sell bullion    buy ring      sell ring")
-    #       [*] fetched    SJC  173000000      173000000       173000000     173000000
-    for fetch_method in [sjc_today, doji_today, pnj_today, btmc_today, btmh_today, pqg_today, mihong_today, ngoctham_today]:
-        def fetch(tries = 10):
+    def fetch(tries = 10):
             try:
                 return fetch_method()
             except requests.ConnectionError:
@@ -218,27 +232,29 @@ def fetch_all() -> list[Price24K]:
                 raise
             except:
                 print(f"[!] fetching {fetch_method.__name__} failed")
-        d = fetch()
-        if d:
-            results.append(d)
-            print(f"[*] fetched    {d.vendor:>4}  {d.buy_bullion}      {d.sell_bullion}       {d.buy_ring}     {d.sell_ring}")
-            with open(os.path.join("data", "snapshotdb.csv"), "a", encoding="utf8") as f:
-                f.write(f"{d.taken_on.isoformat()},{d.vendor},{d.buy_bullion},{d.sell_bullion},{d.buy_ring},{d.sell_ring}\n")
+    d = fetch()
+    print(f"[*] fetched    {d.vendor:>4}  {d.buy_bullion}      {d.sell_bullion}       {d.buy_ring}     {d.sell_ring}")
+    return d, f"{d.taken_on.isoformat()},{d.vendor},{d.buy_bullion},{d.sell_bullion},{d.buy_ring},{d.sell_ring}\n"
+
+def fetch_all() -> list[Price24K]:
+    results = []
+    print(f"            vendor  buy bullion    sell bullion    buy ring      sell ring")
+    #       [*] fetched    SJC  173000000      173000000       173000000     173000000
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        results, csvdata = zip(*executor.map(fetch_thread, (sjc_today, doji_today, pnj_today, btmc_today, btmh_today, pqg_today, mihong_today, ngoctham_today)))
+        results, csvdata = list(results), "".join(csvdata)
+    with open(os.path.join("data", "snapshotdb.csv"), "a", encoding="utf8") as f:
+        f.write(csvdata)
     return results
 
 def run_cron():
-    with open(os.path.join("data", "master.json"), "r", encoding="utf8") as f:
-        contents = f.read()
-        data = []
-        if contents.strip() != "":
-            data = orjson.loads(contents)
-        data.append({
+    with open(os.path.join("data", "master.jsonl"), "a", encoding="utf8") as f:
+        f.buffer.write(orjson.dumps({
             "takenOn": datetime.datetime.now().isoformat(),
             "prices": fetch_all()
-        })
-    with open(os.path.join("data", "master.json"), "w", encoding="utf8") as f:
-        f.buffer.write(orjson.dumps(data))
-        f.buffer.flush()
+        }))
+        f.buffer.write(b"\n")
+        f.flush()
 
 # %%
 run_cron()

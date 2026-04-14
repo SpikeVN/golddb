@@ -1,9 +1,9 @@
-matplotlib
+# matplotlib
 beautifulsoup4
-numpy
-pandas
+# numpy
+# pandas
 requests
-chompjs
-scipy
-pandas-ta
+# chompjs
+# scipy
+# pandas-ta
 orjson
