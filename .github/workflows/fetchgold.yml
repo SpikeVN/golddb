@@ -5,6 +5,9 @@ on:
   schedule:
     - cron: "0 9,12,15,18 * * *"
       timezone: "Asia/Ho_Chi_Minh"
+  push:
+    branches:
+      - main
 
 jobs:
     fetch:
