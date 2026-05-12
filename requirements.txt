@@ -2,8 +2,9 @@
 beautifulsoup4
 # numpy
 # pandas
-requests
+# requests
 # chompjs
 # scipy
 # pandas-ta
 orjson
+curl_cffi

@@ -7,7 +7,9 @@ import dataclasses
 import xml.etree.ElementTree as ET
 import time
 import os
+import traceback
 from concurrent.futures import ThreadPoolExecutor
+
 
 @dataclasses.dataclass
 class Price24K:
@@ -17,6 +19,7 @@ class Price24K:
     sell_ring: int
     taken_on: datetime.datetime
     vendor: str = ""
+
 
 # %%
 # def sjc_onemonth() -> pd.DataFrame:
@@ -44,40 +47,48 @@ class Price24K:
 #         index=pd.DatetimeIndex([datetime.datetime.fromtimestamp(i/1000).date().isoformat() for i, _ in data[0]["data"]])
 #     )
 
+
 # %%
 def sjc_today() -> Price24K:
     buy_bullion: int = 0
     sell_bullion: int = 0
     buy_ring: int = 0
     sell_ring: int = 0
-    with requests.Session() as s:
-        data = s.get("https://sjc.com.vn/GoldPrice/Services/PriceService.ashx", headers={
-            "origin": "https://sjc.com.vn",
-            "priority": "u=1, i",
-            "referer": "https://sjc.com.vn/bieu-do-gia-vang",
-            "sec-ch-ua": '"Not(A:Brand";v="8", "Chromium";v="144", "Microsoft Edge";v="144"',
-            "sec-ch-ua-platform": "Windows",
-            "sec-fetch-dest": "empty",
-            "sec-fetch-mode": "cors",
-            "sec-fetch-site": "same-origin",
-            "sec-gpc": "1",
-            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 Edg/144.0.0.0",
-            "x-requested-with": "XMLHttpRequest"
-        }).json()
-        for i in data["data"]:
-            if i["TypeName"] == "Vàng SJC 1L, 10L, 1KG" and i["BranchName"] == "Hồ Chí Minh":
-                buy_bullion = int(i["BuyValue"])
-                sell_bullion = int(i["SellValue"])
-            if i["TypeName"] == "Vàng nhẫn SJC 99,99% 1 chỉ, 2 chỉ, 5 chỉ" and i["BranchName"] == "Hồ Chí Minh":
-                buy_ring = int(i["BuyValue"])
-                sell_ring = int(i["SellValue"])
-        return Price24K(
-            buy_bullion, sell_bullion, buy_ring, sell_ring, taken_on=datetime.datetime.now(), vendor="SJC"
-        )
+    # TODO - temporary countermeasure as SJC uses Cloudflare
+    # with requests.Session() as s:
+    #     data = s.get("https://sjc.com.vn/GoldPrice/Services/PriceService.ashx")
+    #     for i in data["data"]:
+    #         if i["TypeName"] == "Vàng SJC 1L, 10L, 1KG" and i["BranchName"] == "Hồ Chí Minh":
+    #             buy_bullion = int(i["BuyValue"])
+    #             sell_bullion = int(i["SellValue"])
+    #         if i["TypeName"] == "Vàng nhẫn SJC 99,99% 1 chỉ, 2 chỉ, 5 chỉ" and i["BranchName"] == "Hồ Chí Minh":
+    #             buy_ring = int(i["BuyValue"])
+    #             sell_ring = int(i["SellValue"])
+    #     return Price24K(
+    #         buy_bullion, sell_bullion, buy_ring, sell_ring, taken_on=datetime.datetime.now(), vendor="SJC"
+    #     )
+    data = requests.get(
+        "https://edge-api.pnj.io/ecom-frontend/v1/get-gold-price?zone=00"
+    ).json()
+    for i in data["data"]:
+        if i["masp"] == "SJC":
+            sell_ring = sell_bullion = i["giaban"] * 10000
+            buy_ring = buy_bullion = i["giamua"] * 10000
+    return Price24K(
+        buy_bullion,
+        sell_bullion,
+        buy_ring,
+        sell_ring,
+        taken_on=datetime.datetime.now(),
+        vendor="SJC",
+    )
+
 
 # %%
 def doji_today() -> Price24K:
-    req = requests.get("http://giavang.doji.vn/api/giavang/?api_key=258fbd2a72ce8481089d88c678e9fe4f")
+    req = requests.get(
+        "http://giavang.doji.vn/api/giavang/?api_key=258fbd2a72ce8481089d88c678e9fe4f"
+    )
     req.encoding = "utf8"
     root = ET.fromstring(req.text)
     buy_bullion: int = 0
@@ -96,8 +107,14 @@ def doji_today() -> Price24K:
             buy_ring = int(10_000_000 * float(tag.attrib["Buy"].replace(",", ".")))
             break
     return Price24K(
-        buy_bullion, sell_bullion, buy_ring, sell_ring, taken_on=datetime.datetime.now(), vendor="DOJI"
+        buy_bullion,
+        sell_bullion,
+        buy_ring,
+        sell_ring,
+        taken_on=datetime.datetime.now(),
+        vendor="DOJI",
     )
+
 
 # %%
 def pnj_today() -> Price24K:
@@ -105,70 +122,104 @@ def pnj_today() -> Price24K:
     sell_bullion: int = 0
     buy_ring: int = 0
     sell_ring: int = 0
-    data = requests.get("https://edge-api.pnj.io/ecom-frontend/v1/get-gold-price?zone=00").json()
+    data = requests.get(
+        "https://edge-api.pnj.io/ecom-frontend/v1/get-gold-price?zone=00"
+    ).json()
     for i in data["data"]:
         if i["masp"] == "N24K":
-            sell_ring = i["giaban"]*10000
-            buy_ring = i["giamua"]*10000
+            sell_ring = i["giaban"] * 10000
+            buy_ring = i["giamua"] * 10000
         if i["masp"] == "KB":
-            sell_bullion = i["giaban"]*10000
-            buy_bullion = i["giamua"]*10000
+            sell_bullion = i["giaban"] * 10000
+            buy_bullion = i["giamua"] * 10000
     return Price24K(
-        buy_bullion, sell_bullion, buy_ring, sell_ring, taken_on=datetime.datetime.now(), vendor="PNJ"
+        buy_bullion,
+        sell_bullion,
+        buy_ring,
+        sell_ring,
+        taken_on=datetime.datetime.now(),
+        vendor="PNJ",
     )
+
 
 # %%
 def btmc_today() -> Price24K:
-    soup = bs4.BeautifulSoup(requests.get("https://btmc.vn/gia-vang-theo-ngay.html").text, "html.parser")
+    soup = bs4.BeautifulSoup(
+        requests.get("https://btmc.vn/gia-vang-theo-ngay.html").text, "html.parser"
+    )
     bullion = list(list(soup.find_all(class_="bd_price_home")[0].children)[1].children)[3]  # type: ignore
     ring = list(list(soup.find_all(class_="bd_price_home")[0].children)[1].children)[4]  # type: ignore
-    return Price24K (
+    return Price24K(
         taken_on=datetime.datetime.now(),
-        buy_bullion = int(list(bullion.children)[7].getText().strip()) * 10000,
-        sell_bullion = int(list(bullion.children)[9].getText().strip()) * 10000,
-        buy_ring = int(list(ring.children)[5].getText().strip()) * 10000,
-        sell_ring = int(list(ring.children)[7].getText().strip()) * 10000,
-        vendor="BTMC"
+        buy_bullion=int(list(bullion.children)[7].getText().strip()) * 10000,
+        sell_bullion=int(list(bullion.children)[9].getText().strip()) * 10000,
+        buy_ring=int(list(ring.children)[5].getText().strip()) * 10000,
+        sell_ring=int(list(ring.children)[7].getText().strip()) * 10000,
+        vendor="BTMC",
     )
+
 
 # %%
 def btmh_today() -> Price24K:
-    soup = bs4.BeautifulSoup(requests.get("https://baotinmanhhai.vn/gia-vang-hom-nay", verify=False).text, "html.parser")
+    soup = bs4.BeautifulSoup(
+        requests.get("https://baotinmanhhai.vn/gia-vang-hom-nay", verify=False).text,
+        "html.parser",
+    )
     buy_bullion: int = 0
     sell_bullion: int = 0
     buy_ring: int = 0
     sell_ring: int = 0
 
-    for i in list(filter(lambda x: True if x.select(".items-center") else False,soup.select("div.flex div.grid")))[:-3]:
-        if i.contents[0].contents[1].text == "Nhẫn Tròn ép vỉ (Kim Gia Bảo ) 24K (999.9)":
-            sell_ring = int(i.contents[1].contents[0].contents[0].text.replace(".", "")) * 10
-            buy_ring = int(i.contents[2].contents[0].contents[0].text.replace(".", "")) * 10
+    for i in list(
+        filter(
+            lambda x: True if x.select(".items-center") else False,
+            soup.select("div.flex div.grid"),
+        )
+    )[:-3]:
+        if (
+            i.contents[0].contents[1].text
+            == "Nhẫn Tròn ép vỉ (Kim Gia Bảo ) 24K (999.9)"
+        ):
+            sell_ring = (
+                int(i.contents[1].contents[0].contents[0].text.replace(".", "")) * 10
+            )
+            buy_ring = (
+                int(i.contents[2].contents[0].contents[0].text.replace(".", "")) * 10
+            )
 
         if i.contents[0].contents[1].text == "Đồng vàng Kim Gia Bảo hoa sen":
-            sell_bullion = int(i.contents[1].contents[0].contents[0].text.replace(".", "")) * 10
-            buy_bullion = int(i.contents[2].contents[0].contents[0].text.replace(".", "")) * 10
+            sell_bullion = (
+                int(i.contents[1].contents[0].contents[0].text.replace(".", "")) * 10
+            )
+            buy_bullion = (
+                int(i.contents[2].contents[0].contents[0].text.replace(".", "")) * 10
+            )
 
-    return Price24K(    
+    return Price24K(
         taken_on=datetime.datetime.now(),
         buy_bullion=buy_bullion,
         sell_bullion=sell_bullion,
         buy_ring=buy_ring,
         sell_ring=sell_ring,
-        vendor="BTMH"
+        vendor="BTMH",
     )
+
 
 # %%
 def pqg_today() -> Price24K:
-    soup = bs4.BeautifulSoup(requests.get("https://phuquygroup.vn/").text, "html.parser")
+    soup = bs4.BeautifulSoup(
+        requests.get("https://phuquygroup.vn/").text, "html.parser"
+    )
     price_table = list(soup.select_one("#priceList table").select("tr"))  # type: ignore
-    return Price24K (
+    return Price24K(
         taken_on=datetime.datetime.now(),
-        buy_ring = int(price_table[2].select_one("td.buy-price").text.strip().replace(",", "")) * 10,  # type: ignore
-        sell_ring = int(price_table[2].select_one("td.sell-price").text.strip().replace(",", "")) * 10,  # type: ignore
-        buy_bullion = int(price_table[3].select_one("td.buy-price").text.strip().replace(",", "")) * 10,  # type: ignore
-        sell_bullion = int(price_table[3].select_one("td.sell-price").text.strip().replace(",", "")) * 10,  # type: ignore,
+        buy_ring=int(price_table[2].select_one("td.buy-price").text.strip().replace(",", "")) * 10,  # type: ignore
+        sell_ring=int(price_table[2].select_one("td.sell-price").text.strip().replace(",", "")) * 10,  # type: ignore
+        buy_bullion=int(price_table[3].select_one("td.buy-price").text.strip().replace(",", "")) * 10,  # type: ignore
+        sell_bullion=int(price_table[3].select_one("td.sell-price").text.strip().replace(",", "")) * 10,  # type: ignore
         vendor="PQG",
     )
+
 
 # %%
 def mihong_today() -> Price24K:
@@ -183,15 +234,15 @@ def mihong_today() -> Price24K:
             buy_bullion = buy_ring = i["buyingPrice"] * 10
             sell_ring = sell_bullion = i["sellingPrice"] * 10
 
-
     return Price24K(
         taken_on=datetime.datetime.now(),
         buy_bullion=buy_bullion,
         sell_bullion=sell_bullion,
         buy_ring=buy_ring,
         sell_ring=sell_ring,
-        vendor="MHG"
+        vendor="MHG",
     )
+
 
 # %%
 def ngoctham_today() -> Price24K:
@@ -202,12 +253,43 @@ def ngoctham_today() -> Price24K:
     sell_ring = 0
 
     for i in list(s.select("table.table tr"))[3:]:
-        if list(i.find_all("td", attrs={"class": "name-gold"}))[0].text == "Vàng Ta 999.9":
-            buy_bullion = int(list(i.find_all("td", attrs={"class": "price-buy"}))[0].text.replace(".", "")) * 10
-            sell_bullion = int(list(i.find_all("td", attrs={"class": "price-sell"}))[0].text.replace(".", "")) * 10
+        if (
+            list(i.find_all("td", attrs={"class": "name-gold"}))[0].text
+            == "Vàng Ta 999.9"
+        ):
+            buy_bullion = (
+                int(
+                    list(i.find_all("td", attrs={"class": "price-buy"}))[
+                        0
+                    ].text.replace(".", "")
+                )
+                * 10
+            )
+            sell_bullion = (
+                int(
+                    list(i.find_all("td", attrs={"class": "price-sell"}))[
+                        0
+                    ].text.replace(".", "")
+                )
+                * 10
+            )
         if list(i.find_all("td", attrs={"class": "name-gold"}))[0].text == "Nhẫn 999.9":
-            buy_ring = int(list(i.find_all("td", attrs={"class": "price-buy"}))[0].text.replace(".", "")) * 10
-            sell_ring = int(list(i.find_all("td", attrs={"class": "price-sell"}))[0].text.replace(".", "")) * 10
+            buy_ring = (
+                int(
+                    list(i.find_all("td", attrs={"class": "price-buy"}))[
+                        0
+                    ].text.replace(".", "")
+                )
+                * 10
+            )
+            sell_ring = (
+                int(
+                    list(i.find_all("td", attrs={"class": "price-sell"}))[
+                        0
+                    ].text.replace(".", "")
+                )
+                * 10
+            )
 
     return Price24K(
         taken_on=datetime.datetime.now(),
@@ -215,48 +297,78 @@ def ngoctham_today() -> Price24K:
         sell_bullion=sell_bullion,
         buy_ring=buy_ring,
         sell_ring=sell_ring,
-        vendor="NTH"
+        vendor="NTH",
     )
 
+
 # %%
-def fetch_thread(fetch_method) -> tuple[Price24K, str]:
+def fetch_thread(fetch_method) -> tuple[Price24K, str] | None:
     results = []
-    def fetch(tries = 10):
-            try:
-                return fetch_method()
-            except requests.ConnectionError:
-                if tries > 0:
-                    print(f"Fetch failed for {fetch_method.__name__}. Retrying after 5s (attempt {10 - tries + 1}/10).")
-                    time.sleep(5)
-                    return fetch(tries-1)
-                raise
-            except:
-                print(f"[!] fetching {fetch_method.__name__} failed")
+
+    def fetch(tries=10):
+        try:
+            return fetch_method()
+        except:
+            if tries > 0:
+                print(
+                    f"[!] fetching failed for {fetch_method.__name__}. Retrying after 5s (attempt {10 - tries + 1}/10)."
+                )
+                traceback.print_exc()
+                time.sleep(5)
+                return fetch(tries - 1)
+
     d = fetch()
-    print(f"[*] fetched    {d.vendor:>4}  {d.buy_bullion}      {d.sell_bullion}       {d.buy_ring}     {d.sell_ring}")
-    return d, f"{d.taken_on.isoformat()},{d.vendor},{d.buy_bullion},{d.sell_bullion},{d.buy_ring},{d.sell_ring}\n"
+    if d:
+        print(
+            f"[*] fetched    {d.vendor:>4}  {d.buy_bullion}      {d.sell_bullion}       {d.buy_ring}     {d.sell_ring}"
+        )
+        return (
+            d,
+            f"{d.taken_on.isoformat()},{d.vendor},{d.buy_bullion},{d.sell_bullion},{d.buy_ring},{d.sell_ring}\n",
+        )
+    return None
+
 
 def fetch_all() -> list[Price24K]:
     results = []
     print(f"            vendor  buy bullion    sell bullion    buy ring      sell ring")
     #       [*] fetched    SJC  173000000      173000000       173000000     173000000
     with ThreadPoolExecutor(max_workers=8) as executor:
-        results, csvdata = zip(*executor.map(fetch_thread, (sjc_today, doji_today, pnj_today, btmc_today, btmh_today, pqg_today, mihong_today, ngoctham_today)))
+        r = [
+            i
+            for i in executor.map(
+                fetch_thread,
+                (
+                    sjc_today,
+                    doji_today,
+                    pnj_today,
+                    btmc_today,
+                    btmh_today,
+                    pqg_today,
+                    mihong_today,
+                    ngoctham_today,
+                ),
+            )
+            if i is not None
+        ]
+
+        results, csvdata = zip(*r)
         results, csvdata = list(results), "".join(csvdata)
     with open(os.path.join("data", "snapshotdb.csv"), "a", encoding="utf8") as f:
         f.write(csvdata)
     return results
 
+
 def run_cron():
     with open(os.path.join("data", "master.jsonl"), "a", encoding="utf8") as f:
-        f.buffer.write(orjson.dumps({
-            "takenOn": datetime.datetime.now().isoformat(),
-            "prices": fetch_all()
-        }))
+        f.buffer.write(
+            orjson.dumps(
+                {"takenOn": datetime.datetime.now().isoformat(), "prices": fetch_all()}
+            )
+        )
         f.buffer.write(b"\n")
         f.flush()
 
+
 # %%
 run_cron()
-
-
