@@ -32,9 +32,10 @@ jobs:
 
         - name: Fetch data
           run: |
+            curl -O https://raw.githubusercontent.com/SpikeVN/golddb/refs/heads/main/pyproject.toml
             python3 -c "print('\n\n'.join([''.join(c['source']) for c in __import__('orjson').loads(r'''$(curl https://raw.githubusercontent.com/SpikeVN/golddb/refs/heads/main/fetch.ipynb)''')['cells'] if c['cell_type'] == 'code']))" > ./fetch.py
             uv run fetch.py
-            rm fetch.py
+            rm fetch.py pyproject.toml
 
         - name: Sync data
           uses: stefanzweifel/git-auto-commit-action@v7
