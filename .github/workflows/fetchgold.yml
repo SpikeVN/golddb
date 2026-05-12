@@ -8,7 +8,7 @@ on:
 
 jobs:
     fetch:
-        runs-on: ubuntu-slim
+        runs-on: ubuntu-latest
         permissions:
             contents: write
         steps:
@@ -33,7 +33,7 @@ jobs:
 
         - name: Fetch data
           run: |
-            python3 -c "print('\n\n'.join([''.join(c['source']) for c in __import__('orjson').loads(r'''$(curl https://raw.githubusercontent.com/SpikeVN/golddb/refs/heads/main/fetch.ipynb)''')['cells'] if c['cell_type'] == 'code']))" > ./fetch.py
+            python3 -c "print('\n\n'.join([''.join(c['source']) for c in __import__('json').loads(r'''$(curl https://raw.githubusercontent.com/SpikeVN/golddb/refs/heads/main/fetch.ipynb)''')['cells'] if c['cell_type'] == 'code']))" > ./fetch.py
             uv run fetch.py
             rm fetch.py pyproject.toml
 
