@@ -27,7 +27,7 @@ jobs:
             python-version: "3.12"
 
         - name: Install dependencies
-          run: pip install requests orjson requests
+          run: pip install requests orjson beautifulsoup4
 
         - name: Fetch data
           run: |
