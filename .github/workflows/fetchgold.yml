@@ -21,16 +21,20 @@ jobs:
         - name: "Set up Python"
           uses: actions/setup-python@v6
           with:
-            python-version-file: ".python-version"
+            python-version: "3.12"
 
         - name: Install uv
           uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b
 
         - name: Install dependencies
-          run: uv sync
+          run: |
+            uv sync
 
         - name: Fetch data
-          run: uv run fetch.py
+          run: |
+            python3 -c "print('\n\n'.join([''.join(c['source']) for c in __import__('orjson').loads(r'''$(curl https://raw.githubusercontent.com/SpikeVN/golddb/refs/heads/main/fetch.ipynb)''')['cells'] if c['cell_type'] == 'code']))" > ./fetch.py
+            uv run fetch.py
+            rm fetch.py
 
         - name: Sync data
           uses: stefanzweifel/git-auto-commit-action@v7
@@ -40,4 +44,3 @@ jobs:
             commit_user_name: Thanh Do Phung
             commit_user_email: phungthanhdo@shitcapital.com.vn
             commit_author: Thanh Do Phung <phungthanhdo@shitcapital.com.vn>
-            push_options: "--force"
