@@ -27,7 +27,7 @@ jobs:
           uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b
 
         - name: Install dependencies
-          run: uv sync --frozen
+          run: uv sync
 
         - name: Fetch data
           run: python3 fetch.py

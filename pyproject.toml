@@ -4,8 +4,4 @@ version = "0.1.0"
 description = "Scrape gold prices"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = [
-    "beautifulsoup4>=4.14.3",
-    "orjson>=3.11.9",
-    "requests>=2.33.1",
-]
+dependencies = ["beautifulsoup4>=4.14.3", "orjson>=3.11.9", "requests>=2.34.0"]
