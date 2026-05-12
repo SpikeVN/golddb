@@ -12,10 +12,10 @@ jobs:
         permissions:
             contents: write
         steps:
-        - name: Checkout source code
+        - name: Checkout main source code
           uses: actions/checkout@v6
           with:
-            ref: data
+            ref: main
             persist-credentials: true
 
         - name: "Set up Python"
@@ -27,9 +27,13 @@ jobs:
           uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b
 
         - name: Install dependencies
-          run: |
-            curl -O https://raw.githubusercontent.com/SpikeVN/golddb/refs/heads/main/pyproject.toml
-            uv sync
+          run: uv sync
+
+        - name: Checkout data
+          uses: actions/checkout@v6
+          with:
+            ref: data
+            persist-credentials: true
 
         - name: Fetch data
           run: |
