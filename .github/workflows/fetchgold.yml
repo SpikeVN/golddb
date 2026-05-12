@@ -30,7 +30,7 @@ jobs:
           run: uv sync
 
         - name: Fetch data
-          run: python3 fetch.py
+          run: uv run fetch.py
 
         - name: Sync data
           uses: stefanzweifel/git-auto-commit-action@v7
