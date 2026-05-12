@@ -18,6 +18,11 @@ jobs:
             ref: data
             persist-credentials: true
 
+        - name: Sync source code
+          run: |
+            git fetch origin
+            git rebase origin/main
+
         - name: "Set up Python"
           uses: actions/setup-python@v6
           with:
@@ -40,3 +45,4 @@ jobs:
             commit_user_name: Thanh Do Phung
             commit_user_email: phungthanhdo@shitcapital.com.vn
             commit_author: Thanh Do Phung <phungthanhdo@shitcapital.com.vn>
+            push_options: "--force"
