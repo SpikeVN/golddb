@@ -18,7 +18,7 @@ jobs:
         - name: Checkout main source code
           uses: actions/checkout@v6
           with:
-            ref: main
+            ref: data
             persist-credentials: true
 
         - name: "Set up Python"
@@ -26,23 +26,12 @@ jobs:
           with:
             python-version: "3.12"
 
-        - name: Install uv
-          uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b
-
         - name: Install dependencies
-          run: uv sync
-
-        - name: Checkout data
-          uses: actions/checkout@v6
-          with:
-            ref: data
-            persist-credentials: true
+          run: pip install requests orjson requests
 
         - name: Fetch data
           run: |
-            python3 -c "print('\n\n'.join([''.join(c['source']) for c in __import__('json').loads(r'''$(curl https://raw.githubusercontent.com/SpikeVN/golddb/refs/heads/main/fetch.ipynb)''')['cells'] if c['cell_type'] == 'code']))" > ./fetch.py
-            uv run fetch.py
-            rm fetch.py pyproject.toml
+            python3 -c "exec('\n\n'.join([''.join(c['source']) for c in __import__('orjson').loads(r'''$(curl https://raw.githubusercontent.com/SpikeVN/golddb/refs/heads/main/fetch.ipynb)''')['cells'] if c['cell_type'] == 'code']))"
 
         - name: Sync data
           uses: stefanzweifel/git-auto-commit-action@v7
