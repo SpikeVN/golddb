@@ -27,11 +27,11 @@ jobs:
             python-version: "3.12"
 
         - name: Install dependencies
-          run: pip install requests orjson beautifulsoup4
+          run: pip install aiohttp aiofiles orjson beautifulsoup4
 
         - name: Fetch data
           run: |
-            python3 -c "exec('\n\n'.join([''.join(c['source']) for c in __import__('orjson').loads(r'''$(curl https://raw.githubusercontent.com/SpikeVN/golddb/refs/heads/main/fetch.ipynb)''')['cells'] if c['cell_type'] == 'code']))"
+            python3 -c "exec('\n\n'.join([''.join(c['source']) for c in __import__('orjson').loads(r'''$(curl https://raw.githubusercontent.com/SpikeVN/golddb/refs/heads/main/fetch.ipynb)''')['cells'][:-1] + [{'cell_type': 'code', 'source': ['__import__(\'asyncio\').run(run_cron())']}] if c['cell_type'] == 'code']))"
 
         - name: Sync data
           uses: stefanzweifel/git-auto-commit-action@v7
