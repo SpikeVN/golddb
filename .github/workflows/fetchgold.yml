@@ -29,10 +29,23 @@ jobs:
         - name: Install dependencies
           run: pip install aiohttp aiofiles orjson beautifulsoup4
 
+        - name: Configure secrets
+          env:
+            RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
+            WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
+          run:
+            echo "RAPIDAPI_KEY = \"$RAPIDAPI_KEY\"" > credentials.py
+            echo >> credentials.py
+            echo "WEBHOOK_URL = \"$WEBHOOK_URL\"" >> credentials.py
+
         - name: Fetch data
           run: |
             python3 -c "exec('\n\n'.join([''.join(c['source']) for c in __import__('orjson').loads(r'''$(curl https://raw.githubusercontent.com/SpikeVN/golddb/refs/heads/main/fetch.ipynb)''')['cells'][:-1] + [{'cell_type': 'code', 'source': ['__import__(\'asyncio\').run(run_cron())']}] if c['cell_type'] == 'code']))"
 
+        - name: Remove credentials
+          run:
+            rm credentials.py
+            
         - name: Sync data
           uses: stefanzweifel/git-auto-commit-action@v7
           with:
