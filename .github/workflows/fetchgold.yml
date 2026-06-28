@@ -33,10 +33,11 @@ jobs:
           env:
             RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
             WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
+            PROXY: ${{ vars.PROXY }}
           run: |
-            echo "RAPIDAPI_KEY = \"$RAPIDAPI_KEY\"" > credentials.py
-            echo >> credentials.py
+            echo "RAPIDAPI_KEY = \"$RAPIDAPI_KEY\"" >> credentials.py
             echo "WEBHOOK_URL = \"$WEBHOOK_URL\"" >> credentials.py
+            echo "PROXY = \"$PROXY\"" >> credentials.py
 
         - name: Fetch data
           run: |
