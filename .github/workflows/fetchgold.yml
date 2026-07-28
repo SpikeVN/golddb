@@ -27,7 +27,7 @@ jobs:
             python-version: "3.12"
 
         - name: Install dependencies
-          run: pip install aiohttp aiofiles orjson beautifulsoup4
+          run: pip install aiohttp aiofiles orjson beautifulsoup4 pycryptodome
 
         - name: Configure secrets
           env:
